@@ -35,3 +35,4 @@ O manifesto de rotas neutro está em `public/routes.json`. Ele é apenas um inve
 O protótipo demonstra visão geral do projeto, entregas e versões, pendências, compras, portal do cliente, aprovação, solicitação de alteração e criação simulada de projeto. Os dados são locais e são reiniciados quando a página é recarregada.
 
 Para a próxima fase produtiva, será necessário adicionar backend, autenticação, persistência, armazenamento de arquivos, permissões, notificações e auditoria.
+# arqflow
