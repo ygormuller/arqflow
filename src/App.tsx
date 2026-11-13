@@ -1,4 +1,4 @@
-import { FormEvent, type ReactNode, useMemo, useState } from "react";
+import { FormEvent, type ReactNode, useMemo, useReducer, useState } from "react";
 import {
   AlertCircle,
   ArrowUpRight,
@@ -32,80 +32,17 @@ import {
   UserRound,
   X,
 } from "lucide-react";
+import { initialDeliveries } from "./features/deliveries/data";
+import { deliveryReducer } from "./features/deliveries/flow";
+import { currentVersion, type Delivery } from "./features/deliveries/model";
 
 type Section = "overview" | "deliveries" | "tasks" | "purchases";
 type ViewMode = "office" | "client";
-type DeliveryStatus = "Aguardando aprovação" | "Em revisão" | "Aprovado";
-
-type Delivery = {
-  id: number;
-  title: string;
-  stage: string;
-  room: string;
-  updated: string;
-  version: string;
-  status: DeliveryStatus;
-  type: "image" | "document";
-  author: string;
-  note: string;
-};
-
 const navItems: { id: Section; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "overview", label: "Visão geral", icon: LayoutDashboard },
   { id: "deliveries", label: "Entregas", icon: Layers3 },
   { id: "tasks", label: "Pendências", icon: ListChecks },
   { id: "purchases", label: "Compras", icon: ShoppingBag },
-];
-
-const initialDeliveries: Delivery[] = [
-  {
-    id: 1,
-    title: "Cozinha integrada — imagens finais",
-    stage: "Interiores",
-    room: "Cozinha",
-    updated: "Hoje, 10:42",
-    version: "v03",
-    status: "Aguardando aprovação",
-    type: "image",
-    author: "Elissa Toledo",
-    note: "Atualização da paginação do backsplash e troca dos pendentes sobre a ilha.",
-  },
-  {
-    id: 2,
-    title: "Planta baixa humanizada",
-    stage: "Estudo preliminar",
-    room: "Geral",
-    updated: "Ontem, 16:20",
-    version: "v02",
-    status: "Aprovado",
-    type: "document",
-    author: "Elissa Toledo",
-    note: "Layout validado com ajustes de circulação e posição do banco da entrada.",
-  },
-  {
-    id: 3,
-    title: "Banho social — especificação",
-    stage: "Detalhamento",
-    room: "Banho social",
-    updated: "25 out, 14:05",
-    version: "v01",
-    status: "Em revisão",
-    type: "document",
-    author: "Ygor Muller",
-    note: "Memorial com revestimentos, metais e pontos de iluminação.",
-  },
-  {
-    id: 4,
-    title: "Moodboard sala de estar",
-    stage: "Conceito",
-    room: "Sala de estar",
-    updated: "22 out, 09:18",
-    version: "v01",
-    status: "Aprovado",
-    type: "image",
-    author: "Elissa Toledo",
-    note: "Referências aprovadas para paleta, sofá e marcenaria principal.",
-  },
 ];
 
 const tasks = [
@@ -131,7 +68,7 @@ const activity = [
 function StatusPill({ status }: { status: string }) {
   const className = status.toLowerCase().includes("aprov") || status.toLowerCase().includes("pedido")
     ? "status-pill status-success"
-    : status.toLowerCase().includes("aguard") || status.toLowerCase().includes("cotação")
+    : status.toLowerCase().includes("aguard") || status.toLowerCase().includes("cotação") || status.toLowerCase().includes("alteração")
       ? "status-pill status-warning"
       : "status-pill status-neutral";
   return <span className={className}><span className="status-dot" />{status}</span>;
@@ -215,12 +152,13 @@ function Overview({ onNewProject, setSection, setViewMode, feedback }: { onNewPr
   </>;
 }
 
-function Deliveries({ deliveries, selectedId, setSelectedId, onClientPreview }: { deliveries: Delivery[]; selectedId: number; setSelectedId: (id: number) => void; onClientPreview: () => void }) {
+function Deliveries({ deliveries, selectedId, setSelectedId, onClientPreview, onPublishVersion }: { deliveries: Delivery[]; selectedId: number; setSelectedId: (id: number) => void; onClientPreview: () => void; onPublishVersion: (deliveryId: number) => void }) {
   const selected = deliveries.find(item => item.id === selectedId) ?? deliveries[0];
+  const latest = currentVersion(selected);
   return <>
     <SectionHeading eyebrow="Documentos e versões" title="Entregas" description="A versão certa, no lugar certo, com a decisão registrada." action={<><button className="secondary-button"><Upload size={16} /> Nova entrega</button><button className="primary-button" onClick={onClientPreview}><ExternalLink size={16} /> Abrir portal</button></>} />
     <div className="filter-row"><div className="search-field"><Search size={16} /><input placeholder="Buscar entrega, ambiente ou etapa" /></div><button className="filter-button">Todos os status <ChevronDown size={15} /></button><button className="filter-button">Todos os ambientes <ChevronDown size={15} /></button></div>
-    <div className="deliveries-layout"><div className="deliveries-list">{deliveries.map(item => <button key={item.id} className={selected.id === item.id ? "delivery-row selected" : "delivery-row"} onClick={() => setSelectedId(item.id)}><div className={`file-icon ${item.type}`} >{item.type === "image" ? <ImageIcon size={20} /> : <FileText size={20} />}</div><div className="delivery-row-copy"><strong>{item.title}</strong><span>{item.stage} · {item.room}</span><small>{item.version} · atualizado {item.updated}</small></div><StatusPill status={item.status} /></button>)}<button className="empty-add-row"><Plus size={17} /> Adicionar entrega</button></div><div className="delivery-detail"><div className="detail-header"><div><span className="eyebrow">Detalhe da entrega</span><h2>{selected.title}</h2><p>{selected.stage} · {selected.room}</p></div><button className="icon-button"><MoreHorizontal size={18} /></button></div><div className="preview-canvas"><div className="preview-toolbar"><span><span className="status-dot solid-success" /> {selected.version} · versão atual</span><span><Download size={14} /> Baixar</span></div>{selected.type === "image" ? <div className="render-preview"><div className="render-window"><div className="render-bar"><i /><i /><i /></div><div className="render-scene"><div className="scene-wall" /><div className="scene-window" /><div className="scene-counter" /><div className="scene-island" /><div className="scene-lamp" /><span>COZINHA · ESTUDO 03</span></div></div></div> : <div className="document-preview"><FileText size={42} /><strong>Planta baixa humanizada — {selected.version}</strong><span>PDF · 4 páginas · 6,2 MB</span></div>}</div><div className="detail-note"><div className="note-avatar">{selected.author.split(" ").map(x => x[0]).join("").slice(0, 2)}</div><div><strong>{selected.author}</strong><p>{selected.note}</p></div></div><div className="versions-block"><div className="panel-header"><div><span className="eyebrow">Histórico</span><h3>Versões publicadas</h3></div><button className="text-button">Ver tudo <ArrowUpRight size={14} /></button></div><div className="version-line"><span className="version-badge current">v03</span><div><strong>Hoje, 10:42</strong><span>Atual · aguardando aprovação do cliente</span></div><StatusPill status="Aguardando aprovação" /></div><div className="version-line muted-line"><span className="version-badge">v02</span><div><strong>28 out, 17:30</strong><span>Ajuste de marcenaria · Elissa Toledo</span></div><span className="version-link">Comparar</span></div></div><div className="comment-box"><MessageCircle size={16} /><input placeholder="Adicionar comentário contextual..." /><button><ArrowUpRight size={16} /></button></div></div></div>
+    <div className="deliveries-layout"><div className="deliveries-list">{deliveries.map(item => { const version = currentVersion(item); return <button key={item.id} className={selected.id === item.id ? "delivery-row selected" : "delivery-row"} onClick={() => setSelectedId(item.id)}><div className={`file-icon ${item.type}`}>{item.type === "image" ? <ImageIcon size={20} /> : <FileText size={20} />}</div><div className="delivery-row-copy"><strong>{item.title}</strong><span>{item.stage} · {item.room}</span><small>{version.label} · atualizado {item.updated}</small></div><StatusPill status={version.status} /></button>; })}<button className="empty-add-row"><Plus size={17} /> Adicionar entrega</button></div><div className="delivery-detail"><div className="detail-header"><div><span className="eyebrow">Detalhe da entrega</span><h2>{selected.title}</h2><p>{selected.stage} · {selected.room}</p></div><button className="icon-button"><MoreHorizontal size={18} /></button></div><div className="preview-canvas"><div className="preview-toolbar"><span><span className="status-dot solid-success" /> {latest.label} · versão atual</span><span><Download size={14} /> Baixar</span></div>{selected.type === "image" ? <div className="render-preview"><div className="render-window"><div className="render-bar"><i /><i /><i /></div><div className="render-scene"><div className="scene-wall" /><div className="scene-window" /><div className="scene-counter" /><div className="scene-island" /><div className="scene-lamp" /><span>{selected.room.toUpperCase()} · {latest.label.toUpperCase()}</span></div></div></div> : <div className="document-preview"><FileText size={42} /><strong>{selected.title} — {latest.label}</strong><span>Documento demonstrativo</span></div>}</div><div className="detail-note"><div className="note-avatar">{selected.author.split(" ").map(x => x[0]).join("").slice(0, 2)}</div><div><strong>{selected.author}</strong><p>{selected.note}</p></div></div><div className="versions-block"><div className="panel-header"><div><span className="eyebrow">Histórico</span><h3>Versões publicadas</h3></div>{latest.status === "Alteração solicitada" && <button className="primary-button" onClick={() => onPublishVersion(selected.id)}><Upload size={15} /> Publicar revisão</button>}</div>{[...selected.versions].reverse().map(version => <div className="version-line" key={version.id}><span className={version.id === latest.id ? "version-badge current" : "version-badge"}>{version.label}</span><div><strong>{version.publishedAt}</strong><span>{version.id === latest.id ? "Versão atual" : "Versão anterior"} · {version.status}</span>{version.decision && <span>{version.decision.kind === "approved" ? "Aprovado" : `Alteração solicitada por ${version.decision.actor}`} · {version.decision.decidedAt}{version.decision.comment ? ` · “${version.decision.comment}”` : ""}</span>}</div><StatusPill status={version.status} /></div>)}</div></div></div>
   </>;
 }
 
@@ -234,34 +172,56 @@ function Purchases() {
   return <><SectionHeading eyebrow="Materiais e fornecedores" title="Compras" description="Cada item ligado a um ambiente, uma decisão e uma próxima ação." action={<button className="primary-button"><Plus size={17} /> Adicionar item</button>} /><div className="purchase-summary"><div><span>Valor estimado aberto</span><strong>R$ 5.542</strong><small>4 itens no fluxo</small></div><div><span>Em cotação</span><strong>R$ 1.480</strong><small>1 item</small></div><div><span>Aguardando aprovação</span><strong className="accent-number">R$ 1.190</strong><small>1 item</small></div><div><span>Pedido feito</span><strong className="success-number">R$ 640</strong><small>1 item</small></div></div><div className="purchase-toolbar"><div className="search-field"><Search size={16} /><input placeholder="Buscar item ou fornecedor" /></div><button className="filter-button">Todos os ambientes <ChevronDown size={15} /></button><button className="filter-button">Exportar <Download size={15} /></button></div><div className="purchase-table"><div className="table-header"><span>Item</span><span>Fornecedor</span><span>Quantidade</span><span>Valor estimado</span><span>Status</span><span /></div>{purchases.map(purchase => <div className="table-row" key={purchase.item}><div className="purchase-name"><div className="purchase-icon"><Package size={17} /></div><div><strong>{purchase.item}</strong><span>{purchase.room}</span></div></div><div className="supplier-cell">{purchase.supplier}</div><div>{purchase.qty}</div><div className="value-cell">{purchase.value}</div><div><StatusPill status={purchase.status} /></div><button className="row-more"><MoreHorizontal size={17} /></button></div>)}</div></>;
 }
 
-function ClientPortal({ deliveries, onApprove, onRequestChange }: { deliveries: Delivery[]; onApprove: () => void; onRequestChange: () => void }) {
-  const pending = deliveries.find(item => item.status === "Aguardando aprovação") ?? deliveries[0];
-  return <div className="client-portal"><div className="client-portal-top"><div className="client-brand"><div className="brand-mark small"><span /><span /></div><strong>ARQFLOW</strong><span className="portal-label">PORTAL DO CLIENTE</span></div><div className="client-top-right"><span>Casa Horizonte</span><div className="client-avatar">AR</div></div></div><div className="client-intro"><span className="eyebrow">Olá, Ana e Rafael</span><h1>Vamos deixar a casa com a cara de vocês.</h1><p>Acompanhe as decisões do projeto, aprove entregas e mantenha tudo organizado em um só lugar.</p><div className="client-progress"><div><span>Progresso do projeto</span><strong>68%</strong></div><div className="progress-track"><span style={{ width: "68%" }} /></div></div></div><div className="client-main-grid"><section><div className="client-section-head"><div><span className="eyebrow">Aguardando vocês</span><h2>Uma decisão pendente</h2></div><span className="priority high">Ação necessária</span></div><div className="client-approval-card"><div className="approval-visual"><div className="render-window client-render"><div className="render-bar"><i /><i /><i /></div><div className="render-scene"><div className="scene-wall" /><div className="scene-window" /><div className="scene-counter" /><div className="scene-island" /><div className="scene-lamp" /><span>COZINHA · ESTUDO 03</span></div></div></div><div className="approval-copy"><span className="eyebrow">{pending.stage} · {pending.room}</span><h3>{pending.title}</h3><p>{pending.note}</p><div className="approval-meta"><span><FileImage size={15} /> {pending.version} · publicado hoje</span><span><MessageCircle size={15} /> 2 comentários</span></div><div className="approval-actions"><button className="secondary-button" onClick={onRequestChange}><MessageCircle size={16} /> Solicitar alteração</button><button className="primary-button" onClick={onApprove}><Check size={16} /> Aprovar entrega</button></div></div></div></section><aside className="client-side"><div className="client-side-panel"><div className="panel-header"><div><span className="eyebrow">Seu projeto</span><h2>Resumo rápido</h2></div></div><div className="client-stat"><span>Entregas aprovadas</span><strong>12 <small>de 16</small></strong></div><div className="client-stat"><span>Próximo encontro</span><strong>31 out <small>· 16:00</small></strong></div><div className="client-stat"><span>Compras decididas</span><strong>8 <small>itens</small></strong></div></div><div className="client-side-panel comment-highlight"><MessageCircle size={19} /><div><span className="eyebrow">Último comentário</span><p>“A composição ficou linda. Podemos testar uma opção mais quente para a luz?”</p><strong>Rafael · há 3h</strong></div></div></aside></div><div className="client-footer"><span>Uma decisão clara evita três retrabalhos.</span><span>ArqFlow · espaço seguro do seu projeto</span></div></div>;
+function ClientPortal({ deliveries, onApprove, onRequestChange }: { deliveries: Delivery[]; onApprove: (deliveryId: number, versionId: string) => void; onRequestChange: (deliveryId: number, versionId: string, comment: string) => void }) {
+  const [comment, setComment] = useState("");
+  const pendingDelivery = deliveries.find(item => currentVersion(item).status === "Aguardando aprovação");
+  const pendingVersion = pendingDelivery ? currentVersion(pendingDelivery) : undefined;
+  const shownDelivery = pendingDelivery ?? deliveries[0];
+  const shownVersion = pendingVersion ?? currentVersion(shownDelivery);
+  const canDecide = Boolean(pendingDelivery && pendingVersion);
+  return <div className="client-portal"><div className="client-portal-top"><div className="client-brand"><div className="brand-mark small"><span /><span /></div><strong>ARQFLOW</strong><span className="portal-label">PORTAL DO CLIENTE</span></div><div className="client-top-right"><span>Casa Horizonte</span><div className="client-avatar">AR</div></div></div><div className="client-intro"><span className="eyebrow">Olá, Ana e Rafael</span><h1>Vamos deixar a casa com a cara de vocês.</h1><p>Acompanhe as decisões do projeto, aprove entregas e mantenha tudo organizado em um só lugar.</p><div className="client-progress"><div><span>Progresso do projeto</span><strong>68%</strong></div><div className="progress-track"><span style={{ width: "68%" }} /></div></div></div><div className="client-main-grid"><section><div className="client-section-head"><div><span className="eyebrow">{canDecide ? "Aguardando vocês" : "Decisão registrada"}</span><h2>{canDecide ? "Uma decisão pendente" : "Nenhuma decisão pendente"}</h2></div>{canDecide && <span className="priority high">Ação necessária</span>}</div><div className="client-approval-card"><div className="approval-visual"><div className="render-window client-render"><div className="render-bar"><i /><i /><i /></div><div className="render-scene"><div className="scene-wall" /><div className="scene-window" /><div className="scene-counter" /><div className="scene-island" /><div className="scene-lamp" /><span>{shownDelivery.room.toUpperCase()} · {shownVersion.label.toUpperCase()}</span></div></div></div><div className="approval-copy"><span className="eyebrow">{shownDelivery.stage} · {shownDelivery.room} · {shownVersion.label}</span><h3>{shownDelivery.title}</h3><p>{shownDelivery.note}</p><div className="approval-meta"><span><FileImage size={15} /> {shownVersion.label} · publicado {shownVersion.publishedAt}</span><span><MessageCircle size={15} /> Histórico de decisões: {shownDelivery.versions.filter(version => version.decision).length}</span></div>{canDecide ? <><label className="change-comment-label" htmlFor="change-comment">Se precisar de ajustes, descreva o que deve mudar.</label><textarea id="change-comment" className="change-comment" value={comment} onChange={event => setComment(event.target.value)} placeholder="Ex.: testar uma opção mais quente para a luz" /><div className="approval-actions"><button className="secondary-button" onClick={() => onRequestChange(shownDelivery.id, shownVersion.id, comment)}><MessageCircle size={16} /> Solicitar alteração</button><button className="primary-button" onClick={() => onApprove(shownDelivery.id, shownVersion.id)}><Check size={16} /> Aprovar entrega</button></div></> : <div className="decision-confirmation"><StatusPill status={shownVersion.status} />{shownVersion.decision && <p>{shownVersion.decision.kind === "approved" ? `Aprovada por ${shownVersion.decision.actor}` : `Alteração solicitada por ${shownVersion.decision.actor}`} em {shownVersion.decision.decidedAt}{shownVersion.decision.comment ? `: “${shownVersion.decision.comment}”` : "."}</p>}</div>}</div></div></section><aside className="client-side"><div className="client-side-panel"><div className="panel-header"><div><span className="eyebrow">Seu projeto</span><h2>Resumo rápido</h2></div></div><div className="client-stat"><span>Entregas aprovadas</span><strong>12 <small>de 16</small></strong></div><div className="client-stat"><span>Próximo encontro</span><strong>31 out <small>· 16:00</small></strong></div><div className="client-stat"><span>Compras decididas</span><strong>8 <small>itens</small></strong></div></div><div className="client-side-panel comment-highlight"><MessageCircle size={19} /><div><span className="eyebrow">Último comentário</span><p>“A composição ficou linda. Podemos testar uma opção mais quente para a luz?”</p><strong>Rafael · há 3h</strong></div></div></aside></div><div className="client-footer"><span>Uma decisão clara evita três retrabalhos.</span><span>ArqFlow · espaço seguro do seu projeto</span></div></div>;
 }
 
 export default function Home() {
   const [activeSection, setActiveSection] = useState<Section>("overview");
   const [viewMode, setViewMode] = useState<ViewMode>("office");
-  const [deliveries, setDeliveries] = useState(initialDeliveries);
+  const [deliveryState, dispatch] = useReducer(deliveryReducer, { deliveries: initialDeliveries });
   const [selectedDeliveryId, setSelectedDeliveryId] = useState(1);
   const [showNewProject, setShowNewProject] = useState(false);
   const [feedback, setFeedback] = useState("");
 
+  const deliveries = deliveryState.deliveries;
   const showFeedback = (message: string) => {
     setFeedback(message);
     window.setTimeout(() => setFeedback(""), 3800);
   };
 
-  const approve = () => {
-    setDeliveries(current => current.map(item => item.id === 1 ? { ...item, status: "Aprovado" } : item));
-    showFeedback("Entrega aprovada e registrada no histórico.");
+  const decide = (kind: "approve" | "request-change", deliveryId: number, versionId: string, comment = "") => {
+    const target = deliveries.find(item => item.id === deliveryId)?.versions.find(version => version.id === versionId);
+    if (!target || target.status !== "Aguardando aprovação") {
+      showFeedback("Esta versão já recebeu uma decisão.");
+      return;
+    }
+    if (kind === "request-change" && !comment.trim()) {
+      showFeedback("Descreva o que precisa ser alterado antes de enviar.");
+      return;
+    }
+    const decision = { deliveryId, versionId, actor: "Ana Martins", decidedAt: new Date().toLocaleString("pt-BR") };
+    if (kind === "approve") dispatch({ type: "approve", ...decision });
+    else dispatch({ type: "request-change", ...decision, comment });
+    showFeedback(kind === "approve" ? "Versão aprovada e decisão registrada." : "Alteração solicitada e registrada no histórico.");
   };
 
-  const requestChange = () => showFeedback("Solicitação registrada. O escritório será notificado.");
+  const publishVersion = (deliveryId: number) => {
+    const latest = deliveries.find(item => item.id === deliveryId);
+    if (!latest || currentVersion(latest).status !== "Alteração solicitada") return;
+    dispatch({ type: "publish-version", deliveryId, publishedAt: new Date().toLocaleString("pt-BR") });
+    showFeedback("Nova versão publicada e aguardando aprovação do cliente.");
+  };
 
   const content = useMemo(() => {
-    if (viewMode === "client") return <ClientPortal deliveries={deliveries} onApprove={approve} onRequestChange={requestChange} />;
-    if (activeSection === "deliveries") return <Deliveries deliveries={deliveries} selectedId={selectedDeliveryId} setSelectedId={setSelectedDeliveryId} onClientPreview={() => setViewMode("client")} />;
+    if (viewMode === "client") return <ClientPortal deliveries={deliveries} onApprove={(deliveryId, versionId) => decide("approve", deliveryId, versionId)} onRequestChange={(deliveryId, versionId, comment) => decide("request-change", deliveryId, versionId, comment)} />;
+    if (activeSection === "deliveries") return <Deliveries deliveries={deliveries} selectedId={selectedDeliveryId} setSelectedId={setSelectedDeliveryId} onClientPreview={() => setViewMode("client")} onPublishVersion={publishVersion} />;
     if (activeSection === "tasks") return <Tasks />;
     if (activeSection === "purchases") return <Purchases />;
     return <Overview onNewProject={() => setShowNewProject(true)} setSection={setActiveSection} setViewMode={setViewMode} feedback={feedback} />;

@@ -1,0 +1,51 @@
+import type { Delivery } from "./model";
+
+export const initialDeliveries: Delivery[] = [
+  {
+    id: 1,
+    title: "Cozinha integrada — imagens finais",
+    stage: "Interiores",
+    room: "Cozinha",
+    updated: "Hoje, 10:42",
+    type: "image",
+    author: "Elissa Toledo",
+    note: "Atualização da paginação do backsplash e troca dos pendentes sobre a ilha.",
+    versions: [
+      { id: "1-v02", label: "v02", status: "Alteração solicitada", publishedAt: "28 out, 17:30", decision: { kind: "change-requested", actor: "Ana Martins", decidedAt: "29 out, 09:20", comment: "Testar uma opção mais quente para a luz." } },
+      { id: "1-v03", label: "v03", status: "Aguardando aprovação", publishedAt: "Hoje, 10:42" },
+    ],
+  },
+  {
+    id: 2,
+    title: "Planta baixa humanizada",
+    stage: "Estudo preliminar",
+    room: "Geral",
+    updated: "Ontem, 16:20",
+    type: "document",
+    author: "Elissa Toledo",
+    note: "Layout validado com ajustes de circulação e posição do banco da entrada.",
+    versions: [{ id: "2-v02", label: "v02", status: "Aprovado", publishedAt: "Ontem, 16:20", decision: { kind: "approved", actor: "Ana Martins", decidedAt: "Ontem, 16:20" } }],
+  },
+  {
+    id: 3,
+    title: "Banho social — especificação",
+    stage: "Detalhamento",
+    room: "Banho social",
+    updated: "25 out, 14:05",
+    type: "document",
+    author: "Ygor Muller",
+    note: "Memorial com revestimentos, metais e pontos de iluminação.",
+    versions: [{ id: "3-v01", label: "v01", status: "Em revisão", publishedAt: "25 out, 14:05" }],
+  },
+  {
+    id: 4,
+    title: "Moodboard sala de estar",
+    stage: "Conceito",
+    room: "Sala de estar",
+    updated: "22 out, 09:18",
+    type: "image",
+    author: "Elissa Toledo",
+    note: "Referências aprovadas para paleta, sofá e marcenaria principal.",
+    versions: [{ id: "4-v01", label: "v01", status: "Aprovado", publishedAt: "22 out, 09:18", decision: { kind: "approved", actor: "Rafael Costa", decidedAt: "23 out, 11:00" } }],
+  },
+];
